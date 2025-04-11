@@ -1,0 +1,49 @@
+<!-- Plugin Configuration File. Read more: https://plugins.jetbrains.com/docs/intellij/plugin-configuration-file.html -->
+<idea-plugin>
+    <!-- Unique identifier of the plugin -->
+    <id>ai.faros.intellij</id>
+
+    <!-- Display name of the plugin -->
+    <name>Faros AI</name>
+
+    <!-- Plugin version -->
+    <version>0.1.0</version>
+
+    <!-- Description of the plugin -->
+    <description><![CDATA[
+    Faros AI's IntelliJ IDEA plugin for tracking coding productivity and AI assistance metrics.
+    ]]></description>
+
+    <!-- Plugin vendor -->
+    <vendor email="support@faros.ai" url="https://faros.ai">Faros AI</vendor>
+
+    <!-- Product and plugin compatibility requirements -->
+    <depends>com.intellij.modules.platform</depends>
+    <depends>Git4Idea</depends>
+
+    <!-- Set IDE compatibility for IntelliJ 2022.3+ -->
+    <idea-version since-build="223" until-build="233.*"/>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <!-- Add extensions here -->
+        <toolWindow id="Faros AI" 
+                    secondary="true" 
+                    icon="/icons/faros-icon.svg" 
+                    anchor="right" 
+                    factoryClass="ai.faros.intellij.ui.FarosToolWindowFactory"/>
+
+        <applicationService serviceImplementation="ai.faros.intellij.services.FarosSettingsService"/>
+        <applicationService serviceImplementation="ai.faros.intellij.services.FarosStateService"/>
+        <applicationService serviceImplementation="ai.faros.intellij.services.FarosStatsService"/>
+        <applicationConfigurable 
+                parentId="tools" 
+                instance="ai.faros.intellij.ui.FarosSettingsConfigurable" 
+                id="ai.faros.intellij.settings"
+                displayName="Faros AI"/>
+    </extensions>
+
+    <applicationListeners>
+        <listener class="ai.faros.intellij.services.FarosDocumentListener"
+                  topic="com.intellij.openapi.editor.event.DocumentListener"/>
+    </applicationListeners>
+</idea-plugin> 
