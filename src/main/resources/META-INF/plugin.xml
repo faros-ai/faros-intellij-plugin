@@ -11,7 +11,15 @@
 
     <!-- Description of the plugin -->
     <description><![CDATA[
-    Faros AI's IntelliJ IDEA plugin for tracking coding productivity and AI assistance metrics.
+    Faros AI plugin for JetBrains IDEs, tracking coding productivity and AI assistance metrics across all supported IDEs.
+    
+    Works with IntelliJ IDEA, PyCharm, WebStorm, PhpStorm, Rider, CLion, GoLand, RubyMine, AppCode, and other JetBrains IDEs.
+    
+    Features:
+    - Tracks AI-powered auto-completions and hand-written characters
+    - Displays metrics in a dedicated tool window
+    - Provides statistics on coding productivity
+    - Integrates with Git to track repository and branch information
     ]]></description>
 
     <!-- Plugin vendor -->
@@ -19,9 +27,8 @@
 
     <!-- Product and plugin compatibility requirements -->
     <depends>com.intellij.modules.platform</depends>
-    <depends>Git4Idea</depends>
 
-    <!-- Set IDE compatibility for IntelliJ 2022.3+ -->
+    <!-- Set IDE compatibility for JetBrains IDEs 2022.3+ -->
     <idea-version since-build="223" until-build="233.*"/>
 
     <extensions defaultExtensionNs="com.intellij">

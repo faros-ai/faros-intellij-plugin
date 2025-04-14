@@ -1,6 +1,6 @@
-# Faros AI - IntelliJ Plugin
+# Faros AI - JetBrains IDE Plugin
 
-This is the IntelliJ IDEA plugin for Faros AI, tracking coding productivity and AI assistance metrics.
+This plugin for JetBrains IDEs tracks coding productivity and AI assistance metrics across all supported IDEs, including IntelliJ IDEA, PyCharm, WebStorm, PhpStorm, Rider, CLion, GoLand, RubyMine, and more.
 
 ## Features
 
@@ -12,14 +12,14 @@ This is the IntelliJ IDEA plugin for Faros AI, tracking coding productivity and 
 ## Installation
 
 **From JetBrains Marketplace:**
-1. In IntelliJ IDEA, go to Settings/Preferences → Plugins
+1. In your JetBrains IDE, go to Settings/Preferences → Plugins
 2. Click on "Marketplace"
 3. Search for "Faros AI"
 4. Click "Install"
 
 **Manual Installation:**
 1. Download the latest release `.jar` file
-2. In IntelliJ IDEA, go to Settings/Preferences → Plugins
+2. In your JetBrains IDE, go to Settings/Preferences → Plugins
 3. Click on the gear icon and select "Install Plugin from Disk..."
 4. Select the downloaded `.jar` file
 
@@ -63,7 +63,7 @@ The built plugin can be found in `build/distributions/`.
 ### Technology Stack
 
 - Kotlin - Primary programming language
-- IntelliJ Platform Plugin SDK - For integrating with IntelliJ IDEA
+- IntelliJ Platform Plugin SDK - For integrating with JetBrains IDEs
 - Gradle - For building the plugin
 - Gson - For JSON serialization/deserialization
 

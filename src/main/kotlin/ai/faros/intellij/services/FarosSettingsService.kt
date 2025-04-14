@@ -16,12 +16,12 @@ class FarosSettingsService : PersistentStateComponent<FarosSettingsService> {
     var url: String = "https://prod.api.faros.ai"
     var webhook: String = ""
     var graph: String = "default"
-    var origin: String = "faros-intellij-plugin"
+    var origin: String = "faros-jetbrains-plugin"
     var batchSize: Int = 500
     var batchInterval: Int = 60000
     var autoCompletionCategory: String = "AutoCompletion"
     var handWrittenCategory: String = "HandWritten"
-    var userSource: String = "intellij-plugin"
+    var userSource: String = "jetbrains-plugin"
 
     override fun getState(): FarosSettingsService = this
 

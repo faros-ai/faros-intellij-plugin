@@ -15,8 +15,9 @@ repositories {
 // Read more: https://plugins.jetbrains.com/docs/intellij/tools-gradle-intellij-plugin.html
 intellij {
     version.set("2022.3.3")  // Use a slightly older version that's more stable
-    type.set("IC") // Target IntelliJ IDEA Community Edition
+    type.set("IU") // Target IntelliJ IDEA Ultimate which includes modules for all IDEs
 
+    // Include Git4Idea for development, but our code has fallbacks for IDEs that don't have it
     plugins.set(listOf(
         "Git4Idea"
     ))
