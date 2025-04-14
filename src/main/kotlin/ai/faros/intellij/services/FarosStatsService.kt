@@ -256,6 +256,15 @@ class FarosStatsService {
         return FarosUIUtil.formatPercentage(ratio)
     }
     
+    // Notify that stats have changed (for UI updates)
+    fun notifyStatsChanged() {
+        // This method will be called when stats are updated,
+        // triggering UI refreshes in components that observe this service
+        LOG.info("Stats updated notification sent")
+        ApplicationManager.getApplication().messageBus.syncPublisher(FarosStatsListener.TOPIC)
+            .statsChanged()
+    }
+    
     // Reset all statistics
     fun resetStats() {
         autoCompletionEvents.clear()
@@ -265,4 +274,4 @@ class FarosStatsService {
         hourlyAutoCompletionData.clear()
         hourlyHandWrittenData.clear()
     }
-} 
+}

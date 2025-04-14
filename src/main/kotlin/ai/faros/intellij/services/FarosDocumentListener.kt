@@ -21,6 +21,8 @@ class FarosDocumentListener : DocumentListener {
         AUTO_COMPLETION,
         DELETION,
         NO_CHANGE,
+        SPACE,
+        AUTO_CLOSE_BRACKET,
         UNKNOWN
     }
     
@@ -32,12 +34,9 @@ class FarosDocumentListener : DocumentListener {
     
     // Track last event time to detect rapid completions
     private var lastEventTime = System.currentTimeMillis()
-    private var consecutiveCompletionsCount = 0
     
-    // For more accurate Copilot detection
-    private var pendingCompletion = false
-    private var lastChangeOffset = -1
-    private var lastChangeLength = 0
+    // Auto-bracketing detection
+    private val autoBracketPairs = setOf("()", "[]", "{}", "\"\"", "''", "``")
     
     init {
         // Schedule task to send events periodically
@@ -50,6 +49,15 @@ class FarosDocumentListener : DocumentListener {
         
         LOG.info("FarosDocumentListener initialized")
     }
+fun dispose() {
+        timer.cancel()
+        LOG.info("FarosDocumentListener disposed")
+    }
+
+
+    /**
+     * Check and log events periodically
+     */
     
     private fun checkAndLogEvents() {
         try {
@@ -76,9 +84,7 @@ class FarosDocumentListener : DocumentListener {
     }
     
     override fun beforeDocumentChange(event: DocumentEvent) {
-        // Track where the change is happening for better completion detection
-        lastChangeOffset = event.offset
-        lastChangeLength = event.oldLength
+        // Not needed anymore with the new implementation
     }
     
     override fun documentChanged(event: DocumentEvent) {
@@ -106,25 +112,19 @@ class FarosDocumentListener : DocumentListener {
                 val timeSinceLastEvent = currentTime - lastEventTime
                 lastEventTime = currentTime
                 
-                // Log details about the change
-                LOG.debug("Document change: type=$changeType, offset=${event.offset}, " +
-                          "old length=${event.oldLength}, new length=${event.newFragment.length}, " +
-                          "time since last=${timeSinceLastEvent}ms")
+                // Enhanced logging for diagnosing issues
+                LOG.info("Document change in $filename: type=$changeType, newText='${event.newFragment}', " +
+                        "oldText='${event.oldFragment}', offset=${event.offset}, old length=${event.oldLength}, " +
+                        "new length=${event.newFragment.length}, time since last=${timeSinceLastEvent}ms")
                 
                 when (changeType) {
                     TextChangeType.AUTO_COMPLETION -> {
-                        // Count characters in new fragment, but also consider multiline insertions
-                        val charCountChange = calculateCharDifference(previousText, currentText)
+                        // Calculate non-whitespace character count like in the VS Code extension
+                        val newTextNoWhitespace = event.newFragment.toString().replace("\\s".toRegex(), "")
+                        val charCountChange = newTextNoWhitespace.length
                         
                         if (charCountChange > 0) {
-                            // Check if this is part of a sequence of rapid auto-completions
-                            if (timeSinceLastEvent < 500) { // 500ms threshold for considering related completions
-                                consecutiveCompletionsCount++
-                            } else {
-                                consecutiveCompletionsCount = 0
-                            }
-                            
-                            LOG.info("Detected AUTO_COMPLETION: $charCountChange chars at offset ${event.offset}")
+                            LOG.info("DETECTED AUTO-COMPLETION: $charCountChange non-whitespace chars, content='${event.newFragment}'")
                             
                             val codingEvent = CodingEvent(
                                 Date(), 
@@ -139,15 +139,23 @@ class FarosDocumentListener : DocumentListener {
                             stateService.addAutoCompletionEvent(codingEvent)
                             statsService.addAutoCompletionEvent(codingEvent) // Add to stats service for UI
                             
+                            // Display explicit debug info about the state update
+                            LOG.info("Stats updated - Added auto-completion event: charCount=$charCountChange, " +
+                                    "totalEvents=${stateService.getAutoCompletionEventQueue().size}, " +
+                                    "totalChars=${stateService.getCharCount()}")
+                            
                             // Force UI refresh immediately after auto-completion
                             ApplicationManager.getApplication().invokeLater {
                                 try {
                                     // This will trigger a UI update in the tool window
+                                    LOG.info("Updating UI after auto-completion: $charCountChange chars added")
                                     statsService.notifyStatsChanged()
                                 } catch (e: Exception) {
                                     LOG.error("Error refreshing UI after auto-completion: ${e.message}", e)
                                 }
                             }
+                        } else {
+                            LOG.warn("Auto-completion detected but no non-whitespace characters found: '${event.newFragment}'")
                         }
                     }
                     TextChangeType.HAND_WRITTEN_CHAR -> {
@@ -165,8 +173,7 @@ class FarosDocumentListener : DocumentListener {
                         statsService.addHandWrittenEvent(codingEvent) // Add to stats service for UI
                     }
                     else -> {
-                        // Reset consecutive completions counter for other event types
-                        consecutiveCompletionsCount = 0
+                        // No specific action needed for other change types
                     }
                 }
             } catch (e: Exception) {
@@ -177,63 +184,78 @@ class FarosDocumentListener : DocumentListener {
     
     private fun calculateCharDifference(oldText: String, newText: String): Int {
         if (oldText.length >= newText.length) return 0
-        
         return newText.length - oldText.length
     }
     
     private fun classifyTextChange(event: DocumentEvent, previousText: String, currentText: String): TextChangeType {
-        val newText = event.newFragment
-        val oldText = event.oldFragment
+        val newText = event.newFragment.toString()
+        val oldText = event.oldFragment.toString()
         
-        // Instant detection for standard patterns
-        if (oldText.length > 0 && newText.length == 0) {
+        // Debug logging for diagnosing issues
+        LOG.debug("Change details - oldText: '$oldText', newText: '$newText', " +
+                  "offset: ${event.offset}, oldLength: ${event.oldLength}, " +
+                  "prevTextLen: ${previousText.length}, currTextLen: ${currentText.length}")
+        
+        // Match VSCode extension's change classification logic
+        
+        // Check for deletion (content removed)
+        if (oldText.isNotEmpty() && newText.isEmpty()) {
             return TextChangeType.DELETION
-        } else if (newText.length == 1 && oldText.isEmpty()) {
+        }
+        
+        // Check for single character typed
+        if (newText.length == 1 && oldText.isEmpty()) {
             return TextChangeType.HAND_WRITTEN_CHAR
         }
         
-        // GitHub Copilot often inserts with Tab key
-        // If offset matches cursor position (lastChangeOffset) and the new text is substantial
-        if (event.offset == lastChangeOffset && newText.length > 2) {
-            LOG.debug("Likely Copilot tab completion at cursor position")
-            return TextChangeType.AUTO_COMPLETION
+        // Check for whitespace only
+        if (newText.isNotEmpty() && newText.trim().isEmpty()) {
+            return TextChangeType.SPACE
         }
         
-        // Check for multi-line insertion (common in Copilot)
-        if (newText.contains('\n') && previousText.length < currentText.length) {
-            LOG.debug("Detected multi-line insertion - likely Copilot completion")
-            return TextChangeType.AUTO_COMPLETION
+        // Check for auto-closing brackets
+        if (newText.length == 2 && oldText.isEmpty() && autoBracketPairs.contains(newText)) {
+            return TextChangeType.AUTO_CLOSE_BRACKET
         }
         
-        // Check for significant insertion (more than 3 chars at once)
-        if (newText.length > 3 && !newText.toString().trim().isEmpty()) {
-            LOG.debug("Detected significant insertion (${newText.length} chars) - likely AI completion")
-            return TextChangeType.AUTO_COMPLETION
-        }
-        
-        // Check if the change looks like a tab completion from copilot
-        // Copilot often completes with indentation and special patterns
-        if (previousText.length < currentText.length) {
-            val addedText = if (event.offset + oldText.length < currentText.length) {
-                currentText.substring(event.offset + oldText.length)
-            } else {
-                newText.toString()
-            }
+        // Most importantly: Check for Copilot auto-completion
+        // This is the key part that aligns with VSCode extension logic
+        if (newText.isNotEmpty()) {
+            // Get non-whitespace content
+            val nonWhitespaceContent = newText.replace("\\s".toRegex(), "")
             
-            // Check for code-like patterns (brackets, semicolons, etc.)
-            if (addedText.matches(Regex(".*[{}();=].*")) || 
-                addedText.contains("=>") || 
-                addedText.contains("->")) {
-                LOG.debug("Detected code pattern in insertion - likely AI completion")
-                return TextChangeType.AUTO_COMPLETION
+            // If there's actual content (not just whitespace) and the document grew larger
+            if (nonWhitespaceContent.isNotEmpty() && currentText.length > previousText.length) {
+                // Check for common code patterns that suggest Copilot completions
+                if (newText.length > 3 || 
+                    newText.contains("\n") || 
+                    nonWhitespaceContent.contains("{") || 
+                    nonWhitespaceContent.contains("}") || 
+                    nonWhitespaceContent.contains("(") || 
+                    nonWhitespaceContent.contains(")") ||
+                    nonWhitespaceContent.contains(";") ||
+                    newText.contains("=>") ||
+                    newText.contains("->")
+                ) {
+                    LOG.debug("Detected code-like structure in completion: '$newText'")
+                    return TextChangeType.AUTO_COMPLETION
+                }
+                
+                // Check for multi-word completions (likely Copilot)
+                if (newText.contains(" ") && newText.length > 5) {
+                    LOG.debug("Detected multi-word completion: '$newText'")
+                    return TextChangeType.AUTO_COMPLETION
+                }
+                
+                // Check for substantial completion (just based on size)
+                if (nonWhitespaceContent.length > 2) {
+                    LOG.debug("Detected substantial completion: '$newText'")
+                    return TextChangeType.AUTO_COMPLETION
+                }
             }
         }
         
-        // Fallback: if it's a substantial addition but not a single char, consider it auto-completion
-        return if (newText.length > 1) {
-            TextChangeType.AUTO_COMPLETION
-        } else {
-            TextChangeType.UNKNOWN
-        }
+        // Default case
+        return TextChangeType.UNKNOWN
     }
 } 
