@@ -25,6 +25,18 @@ class FarosDocumentListener : DocumentListener {
         AUTO_CLOSE_BRACKET,
         UNKNOWN
     }
+
+    // Singleton instance
+    companion object {
+        @JvmStatic
+        fun getInstance(): FarosDocumentListener {
+            return Holder.INSTANCE
+        }
+    }
+    private object Holder {
+        val INSTANCE = FarosDocumentListener()
+    }
+
     
     private val LOG = Logger.getInstance(FarosDocumentListener::class.java)
     private val stateService = FarosStateService.getInstance()
@@ -47,11 +59,18 @@ class FarosDocumentListener : DocumentListener {
             }
         }, 0, FarosSettingsService.getInstance().batchInterval.toLong())
         
-        LOG.info("FarosDocumentListener initialized")
+        LOG.info(">>> FarosDocumentListener initialized - waiting for document changes")
+        try {
+            LOG.info(">>> FarosDocumentListener settings: batchInterval=${FarosSettingsService.getInstance().batchInterval}ms")
+            LOG.info(">>> Git4Idea available: ${GitUtil.isGit4IdeaAvailable()}")
+        } catch (e: Exception) {
+            LOG.error(">>> Error during FarosDocumentListener initialization", e)
+        }
     }
-fun dispose() {
+    
+    fun dispose() {
         timer.cancel()
-        LOG.info("FarosDocumentListener disposed")
+        LOG.info(">>> FarosDocumentListener disposed")
     }
 
 
@@ -84,12 +103,22 @@ fun dispose() {
     }
     
     override fun beforeDocumentChange(event: DocumentEvent) {
-        // Not needed anymore with the new implementation
+        // Log that we received a beforeDocumentChange event
+        val document = event.document
+        val file = FileDocumentManager.getInstance().getFile(document)
+        LOG.info(">>> beforeDocumentChange received for file: ${file?.name ?: "unknown"}, offset: ${event.offset}, length: ${event.oldLength}")
     }
     
     override fun documentChanged(event: DocumentEvent) {
         val document = event.document
-        val file = FileDocumentManager.getInstance().getFile(document) ?: return
+        val file = FileDocumentManager.getInstance().getFile(document)
+        
+        LOG.info(">>> documentChanged received for file: ${file?.name ?: "unknown"}, offset: ${event.offset}, newText: '${event.newFragment}', oldText: '${event.oldFragment}'")
+        
+        if (file == null) {
+            LOG.warn(">>> Cannot process document change: file is null")
+            return
+        }
         
         ApplicationManager.getApplication().invokeLater {
             try {
@@ -98,6 +127,7 @@ fun dispose() {
                 
                 // Skip empty documents
                 if (previousText.isEmpty() && currentText.length <= 1) {
+                    LOG.info(">>> Skipping empty document")
                     return@invokeLater
                 }
                 
@@ -113,7 +143,7 @@ fun dispose() {
                 lastEventTime = currentTime
                 
                 // Enhanced logging for diagnosing issues
-                LOG.info("Document change in $filename: type=$changeType, newText='${event.newFragment}', " +
+                LOG.info(">>> Document change in $filename: type=$changeType, newText='${event.newFragment}', " +
                         "oldText='${event.oldFragment}', offset=${event.offset}, old length=${event.oldLength}, " +
                         "new length=${event.newFragment.length}, time since last=${timeSinceLastEvent}ms")
                 
@@ -124,7 +154,7 @@ fun dispose() {
                         val charCountChange = newTextNoWhitespace.length
                         
                         if (charCountChange > 0) {
-                            LOG.info("DETECTED AUTO-COMPLETION: $charCountChange non-whitespace chars, content='${event.newFragment}'")
+                            LOG.info(">>> DETECTED AUTO-COMPLETION: $charCountChange non-whitespace chars, content='${event.newFragment}'")
                             
                             val codingEvent = CodingEvent(
                                 Date(), 
@@ -140,7 +170,7 @@ fun dispose() {
                             statsService.addAutoCompletionEvent(codingEvent) // Add to stats service for UI
                             
                             // Display explicit debug info about the state update
-                            LOG.info("Stats updated - Added auto-completion event: charCount=$charCountChange, " +
+                            LOG.info(">>> Stats updated - Added auto-completion event: charCount=$charCountChange, " +
                                     "totalEvents=${stateService.getAutoCompletionEventQueue().size}, " +
                                     "totalChars=${stateService.getCharCount()}")
                             
@@ -148,17 +178,19 @@ fun dispose() {
                             ApplicationManager.getApplication().invokeLater {
                                 try {
                                     // This will trigger a UI update in the tool window
-                                    LOG.info("Updating UI after auto-completion: $charCountChange chars added")
+                                    LOG.info(">>> Updating UI after auto-completion: $charCountChange chars added")
                                     statsService.notifyStatsChanged()
                                 } catch (e: Exception) {
-                                    LOG.error("Error refreshing UI after auto-completion: ${e.message}", e)
+                                    LOG.error(">>> Error refreshing UI after auto-completion: ${e.message}", e)
                                 }
                             }
                         } else {
-                            LOG.warn("Auto-completion detected but no non-whitespace characters found: '${event.newFragment}'")
+                            LOG.warn(">>> Auto-completion detected but no non-whitespace characters found: '${event.newFragment}'")
                         }
                     }
                     TextChangeType.HAND_WRITTEN_CHAR -> {
+                        LOG.info(">>> DETECTED HAND-WRITTEN CHAR: '${event.newFragment}'")
+                        
                         val codingEvent = CodingEvent(
                             Date(),
                             1,
@@ -171,13 +203,16 @@ fun dispose() {
                         )
                         stateService.addHandWrittenEvent(codingEvent)
                         statsService.addHandWrittenEvent(codingEvent) // Add to stats service for UI
+                        
+                        LOG.info(">>> Hand-written event added, total=${stateService.getHandWrittenEventQueue().size}")
                     }
                     else -> {
-                        // No specific action needed for other change types
+                        LOG.info(">>> Change type $changeType not tracked")
                     }
                 }
             } catch (e: Exception) {
-                LOG.error("Error processing document change: ${e.message}", e)
+                LOG.error(">>> Error processing document change: ${e.message}", e)
+                e.printStackTrace()
             }
         }
     }
@@ -192,7 +227,7 @@ fun dispose() {
         val oldText = event.oldFragment.toString()
         
         // Debug logging for diagnosing issues
-        LOG.debug("Change details - oldText: '$oldText', newText: '$newText', " +
+        LOG.debug(">>> Change classification - oldText: '$oldText', newText: '$newText', " +
                   "offset: ${event.offset}, oldLength: ${event.oldLength}, " +
                   "prevTextLen: ${previousText.length}, currTextLen: ${currentText.length}")
         
@@ -237,19 +272,19 @@ fun dispose() {
                     newText.contains("=>") ||
                     newText.contains("->")
                 ) {
-                    LOG.debug("Detected code-like structure in completion: '$newText'")
+                    LOG.debug(">>> Detected code-like structure in completion: '$newText'")
                     return TextChangeType.AUTO_COMPLETION
                 }
                 
                 // Check for multi-word completions (likely Copilot)
                 if (newText.contains(" ") && newText.length > 5) {
-                    LOG.debug("Detected multi-word completion: '$newText'")
+                    LOG.debug(">>> Detected multi-word completion: '$newText'")
                     return TextChangeType.AUTO_COMPLETION
                 }
                 
                 // Check for substantial completion (just based on size)
                 if (nonWhitespaceContent.length > 2) {
-                    LOG.debug("Detected substantial completion: '$newText'")
+                    LOG.debug(">>> Detected substantial completion: '$newText'")
                     return TextChangeType.AUTO_COMPLETION
                 }
             }

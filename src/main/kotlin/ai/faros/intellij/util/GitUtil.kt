@@ -16,7 +16,8 @@ object GitUtil {
     /**
      * Check if Git4Idea is available
      */
-    private fun isGit4IdeaAvailable(): Boolean {
+    @JvmStatic
+    fun isGit4IdeaAvailable(): Boolean {
         return try {
             Class.forName("git4idea.GitUtil")
             true

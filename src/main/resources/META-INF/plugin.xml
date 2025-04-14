@@ -42,11 +42,14 @@
         <applicationService serviceImplementation="ai.faros.intellij.services.FarosSettingsService"/>
         <applicationService serviceImplementation="ai.faros.intellij.services.FarosStateService"/>
         <applicationService serviceImplementation="ai.faros.intellij.services.FarosStatsService"/>
+        <applicationService serviceImplementation="ai.faros.intellij.FarosAppActivator"/>
         <applicationConfigurable 
                 parentId="tools" 
                 instance="ai.faros.intellij.ui.FarosSettingsConfigurable" 
                 id="ai.faros.intellij.settings"
                 displayName="Faros AI"/>
+                
+        <postStartupActivity implementation="ai.faros.intellij.FarosStartupActivity"/>
     </extensions>
 
     <applicationListeners>
