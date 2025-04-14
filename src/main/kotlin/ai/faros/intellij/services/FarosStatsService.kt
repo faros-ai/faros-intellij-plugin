@@ -12,6 +12,9 @@ import kotlin.math.round
 @Service
 class FarosStatsService {
     private val LOG = Logger.getInstance(FarosStatsService::class.java)
+    private val persistenceService = FarosMetricsPersistenceService.getInstance()
+    
+    // Use CopyOnWriteArrayList for thread-safety during collection
     private val autoCompletionEvents = CopyOnWriteArrayList<CodingEvent>()
     private val handWrittenEvents = CopyOnWriteArrayList<CodingEvent>()
     
@@ -74,6 +77,31 @@ class FarosStatsService {
         }
     }
     
+    init {
+        // Load persisted data when service is initialized
+        loadPersistedData()
+    }
+    
+    private fun loadPersistedData() {
+        // Copy persisted data to in-memory collections
+        autoCompletionEvents.addAll(persistenceService.autoCompletionEvents)
+        handWrittenEvents.addAll(persistenceService.handWrittenEvents)
+        repositoryStats.putAll(persistenceService.repositoryStats)
+        languageStats.putAll(persistenceService.languageStats)
+        hourlyAutoCompletionData.putAll(persistenceService.hourlyAutoCompletionData)
+        hourlyHandWrittenData.putAll(persistenceService.hourlyHandWrittenData)
+    }
+    
+    private fun persistData() {
+        // Save current data to persistence service
+        persistenceService.autoCompletionEvents = ArrayList(autoCompletionEvents)
+        persistenceService.handWrittenEvents = ArrayList(handWrittenEvents)
+        persistenceService.repositoryStats = repositoryStats.toMutableMap()
+        persistenceService.languageStats = languageStats.toMutableMap()
+        persistenceService.hourlyAutoCompletionData = hourlyAutoCompletionData.toMutableMap()
+        persistenceService.hourlyHandWrittenData = hourlyHandWrittenData.toMutableMap()
+    }
+    
     fun addAutoCompletionEvent(event: CodingEvent) {
         autoCompletionEvents.add(event)
         
@@ -91,6 +119,9 @@ class FarosStatsService {
             languageStats[event.language] = (languageStats[event.language] ?: 0) + 1
         }
         
+        // Persist data after update
+        persistData()
+        
         LOG.debug("Added auto-completion event: ${event.charCountChange} chars, repo: ${event.repository}, lang: ${event.language}")
     }
     
@@ -100,6 +131,9 @@ class FarosStatsService {
         // Update hourly data
         val hourKey = formatHourKey(event.timestamp)
         hourlyHandWrittenData[hourKey] = (hourlyHandWrittenData[hourKey] ?: 0) + event.charCountChange
+        
+        // Persist data after update
+        persistData()
         
         LOG.debug("Added hand-written event")
     }
@@ -114,10 +148,12 @@ class FarosStatsService {
     
     fun clearAutoCompletionEvents() {
         autoCompletionEvents.clear()
+        persistData()
     }
     
     fun clearHandWrittenEvents() {
         handWrittenEvents.clear()
+        persistData()
     }
     
     // Get total completion stats
@@ -273,5 +309,8 @@ class FarosStatsService {
         languageStats.clear()
         hourlyAutoCompletionData.clear()
         hourlyHandWrittenData.clear()
+        
+        // Also clear persisted data
+        persistData()
     }
 }

@@ -42,6 +42,7 @@
         <applicationService serviceImplementation="ai.faros.intellij.services.FarosSettingsService"/>
         <applicationService serviceImplementation="ai.faros.intellij.services.FarosStateService"/>
         <applicationService serviceImplementation="ai.faros.intellij.services.FarosStatsService"/>
+        <applicationService serviceImplementation="ai.faros.intellij.services.FarosMetricsPersistenceService"/>
         <applicationService serviceImplementation="ai.faros.intellij.FarosAppActivator"/>
         <applicationConfigurable 
                 parentId="tools" 

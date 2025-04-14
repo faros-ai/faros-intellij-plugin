@@ -14,4 +14,20 @@ interface FarosStatsListener {
      * Called when statistics have been updated
      */
     fun statsChanged()
+    /**
+     * Called when statistics have been sent
+     */
+    fun statsSent()
+    /**
+     * Called when statistics have been cleared
+     */
+    fun statsCleared()
+    /**
+     * Called when statistics have been reset
+     */
+    fun statsReset()
+    /**
+     * Called when statistics have been sent to the server
+     */
+    fun statsSentToServer()
 } 
