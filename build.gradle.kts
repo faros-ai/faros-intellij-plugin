@@ -58,7 +58,7 @@ tasks {
 
     patchPluginXml {
         sinceBuild.set("223")
-        untilBuild.set("233.*")
+        untilBuild.set("261.*") // or "999.*" if you want no upper limit (not recommended for public plugins)
     }
 
     buildSearchableOptions {

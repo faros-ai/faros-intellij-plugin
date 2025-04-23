@@ -111,31 +111,39 @@ class FarosDocumentListener : DocumentListener {
         ApplicationManager.getApplication().invokeLater {
             try {
                 val currentText = document.text
+                val startLine = document.getLineNumber(event.offset) + 1
+                val endOffset = event.offset + event.newLength
+                val endLine = document.getLineNumber(endOffset.coerceAtMost(document.textLength)) + 1
                 val previousText = lastTextRef.getAndSet(currentText)
-                
+
                 // Skip empty documents
                 if (previousText.isEmpty() && currentText.length <= 1) {
                     return@invokeLater
                 }
-                
+
                 val changeType = classifyTextChange(event, previousText, currentText)
                 val filename = file.path
                 val extension = file.extension ?: ""
                 val language = file.fileType.name
                 val repository = GitUtil.getGitRepoName(file)
                 val branch = GitUtil.getGitBranch(file)
-                
+
                 val currentTime = System.currentTimeMillis()
                 val timeSinceLastEvent = currentTime - lastEventTime
                 lastEventTime = currentTime
-                
-                // Log document changes for monitoring
-                if (LOG.isDebugEnabled) {
-                    LOG.debug("Document change in $filename: type=$changeType, newText='${event.newFragment}', " +
-                            "oldText='${event.oldFragment}', offset=${event.offset}, old length=${event.oldLength}, " +
-                            "new length=${event.newFragment.length}, time since last=${timeSinceLastEvent}ms")
-                }
-                
+
+                // Log details about the change
+                LOG.info("Document change: type=$changeType, offset=${event.offset}, " +
+                          "old length=${event.oldLength}, new length=${event.newFragment.length}, " +
+                          "lines=$startLine-$endLine, time since last=${timeSinceLastEvent}ms")
+                LOG.info(
+                    "Event: { \"offset\": ${event.offset}, \"oldLength\": ${event.oldLength}, " +
+                            "\"newLength\": ${event.newFragment.length}, \"oldFragment\": \"${event.oldFragment}\", " +
+                            "\"newFragment\": \"${event.newFragment}\", \"file\": \"${file.path}\", " +
+                            "\"extension\": \"${file.extension ?: ""}\", \"language\": \"${file.fileType.name}\", " +
+                            "\"repo\": \"${GitUtil.getGitRepoName(file)}\", \"branch\": \"${GitUtil.getGitBranch(file)}\", " +
+                            "\"startLine\": $startLine, \"endLine\": $endLine }"
+                )
                 when (changeType) {
                     TextChangeType.AUTO_COMPLETION -> {
                         // Calculate non-whitespace character count like in the VS Code extension
@@ -143,8 +151,6 @@ class FarosDocumentListener : DocumentListener {
                         val charCountChange = newTextNoWhitespace.length
                         
                         if (charCountChange > 0) {
-                            LOG.info("DETECTED AUTO-COMPLETION: $charCountChange non-whitespace chars")
-                            
                             val codingEvent = CodingEvent(
                                 Date(), 
                                 charCountChange, 

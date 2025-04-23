@@ -29,7 +29,7 @@
     <depends>com.intellij.modules.platform</depends>
 
     <!-- Set IDE compatibility for JetBrains IDEs 2022.3+ -->
-    <idea-version since-build="223" until-build="233.*"/>
+    <idea-version since-build="223" until-build="261.*"/>
 
     <extensions defaultExtensionNs="com.intellij">
         <!-- Add extensions here -->
